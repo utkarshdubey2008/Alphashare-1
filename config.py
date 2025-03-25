@@ -18,35 +18,43 @@ DATABASE_NAME = os.getenv("DATABASE_NAME")
 # Channel Configuration
 DB_CHANNEL_ID = int(os.getenv("DB_CHANNEL_ID"))
 
-# Force Subscription Channels
-FSUB_CHNL_ID = os.getenv("FSUB_CHNL_ID", None)
-FSUB_CHNL_LINK = os.getenv("FSUB_CHNL_LINK", None)
-FSUB_CHNL_2_ID = os.getenv("FSUB_CHNL_2_ID", None)
-FSUB_CHNL_2_LINK = os.getenv("FSUB_CHNL_2_LINK", None)
-FSUB_CHNL_3_ID = os.getenv("FSUB_CHNL_3_ID", None)
-FSUB_CHNL_3_LINK = os.getenv("FSUB_CHNL_3_LINK", None)
-FSUB_CHNL_4_ID = os.getenv("FSUB_CHNL_4_ID", None)
-FSUB_CHNL_4_LINK = os.getenv("FSUB_CHNL_4_LINK", None)
+# Environment variables
+FSUB_CHNL_ID = os.getenv("FSUB_CHNL_ID", "").strip()
+FSUB_CHNL_LINK = os.getenv("FSUB_CHNL_LINK", "").strip()
+FSUB_CHNL_2_ID = os.getenv("FSUB_CHNL_2_ID", "").strip()
+FSUB_CHNL_2_LINK = os.getenv("FSUB_CHNL_2_LINK", "").strip()
+FSUB_CHNL_3_ID = os.getenv("FSUB_CHNL_3_ID", "").strip()
+FSUB_CHNL_3_LINK = os.getenv("FSUB_CHNL_3_LINK", "").strip()
+FSUB_CHNL_4_ID = os.getenv("FSUB_CHNL_4_ID", "").strip()
+FSUB_CHNL_4_LINK = os.getenv("FSUB_CHNL_4_LINK", "").strip()
 
-# Force Subscribe Channel List - Only adds channels that are configured
 FORCE_SUB_CHANNELS = []
-FORCE_SUB_LINKS = {}
+FORCE_SUB_LINKS = {}  
 
-# Add channels if they exist and are valid
 for i, (channel_id, channel_link) in enumerate([
     (FSUB_CHNL_ID, FSUB_CHNL_LINK),
     (FSUB_CHNL_2_ID, FSUB_CHNL_2_LINK),
     (FSUB_CHNL_3_ID, FSUB_CHNL_3_LINK),
     (FSUB_CHNL_4_ID, FSUB_CHNL_4_LINK)
-], 1):
-    if channel_id and channel_id.strip():
-        try:
-            cid = int(channel_id)
-            FORCE_SUB_CHANNELS.append(cid)
-            if channel_link and channel_link.strip():
-                FORCE_SUB_LINKS[cid] = channel_link
-        except ValueError:
-            print(f"⚠️ Warning: Invalid FSUB_CHNL_{i}_ID: {channel_id}")
+], start=1):
+    if not channel_id:
+        continue  # Skip if empty
+    
+    try:
+        cid = int(channel_id)
+        FORCE_SUB_CHANNELS.append(cid)
+        
+        # Only store the link if it's valid
+        if channel_link and channel_link.startswith(("https://t.me/", "t.me/")):
+            FORCE_SUB_LINKS[cid] = channel_link
+        else:
+            print(f"⚠️ Warning: Invalid FSUB_CHNL_{i}_LINK: {channel_link}")
+    except ValueError:
+        print(f"❌ Error: FSUB_CHNL_{i}_ID must be an integer, got: {channel_id}")
+
+# Optional: Validate at least one channel is configured
+if not FORCE_SUB_CHANNELS:
+    print("⚠️ Warning: No force-subscribe channels configured!")
 
 # Bot Information
 BOT_USERNAME = os.getenv("BOT_USERNAME", "")
