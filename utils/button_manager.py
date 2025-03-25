@@ -9,70 +9,58 @@ from pyrogram import Client
 class ButtonManager:
     def __init__(self):
         self.db_channel = config.DB_CHANNEL_ID
-        self._init_channels()
-
-    def _init_channels(self):
-        """Initialize force subscription channels"""
-        self.channel_configs = []
-        # Only initialize the first two channels as per requirement
-        channels = [
-            (config.FSUB_CHNL_ID, config.FSUB_CHNL_LINK, "Main"),
-            (config.FSUB_CHNL_2_ID, config.FSUB_CHNL_2_LINK, "Second")
-        ]
-        
-        for channel_id, link, name in channels:
-            if channel_id and link:
-                try:
-                    # Handle channel ID with or without -100 prefix
-                    clean_id = str(channel_id).replace("-100", "")
-                    int_id = int(clean_id)
-                    final_id = f"-100{int_id}" if not str(int_id).startswith("-100") else str(int_id)
-                    self.channel_configs.append((final_id, link, name))
-                except (ValueError, TypeError):
-                    logging.error(f"Invalid channel ID format for {name} channel: {channel_id}")
+        self.force_sub_channels = config.FORCE_SUB_CHANNELS
+        self.force_sub_links = config.FORCE_SUB_LINKS
 
     async def check_force_sub(self, client: Client, user_id: int) -> bool:
-        """Check user's subscription status in all required channels"""
-        if not self.channel_configs:
+        """Check user's subscription status in configured channels"""
+        if not self.force_sub_channels:
             return True
 
-        for channel_id, channel_link, name in self.channel_configs:
+        for channel_id in self.force_sub_channels:
             try:
-                # Try to get chat member info
-                member = await client.get_chat_member(chat_id=int(channel_id), user_id=user_id)
-                
-                # Check if user is banned/kicked first
+                member = await client.get_chat_member(chat_id=channel_id, user_id=user_id)
                 if member.status in [ChatMemberStatus.BANNED, ChatMemberStatus.LEFT, ChatMemberStatus.RESTRICTED]:
                     return False
-                    
-                # Check for valid member status
                 if member.status not in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
                     return False
-                    
             except UserNotParticipant:
                 return False
             except BadRequest as e:
-                logging.error(f"Bot is not admin in channel {name} ({channel_id}) or channel is invalid: {str(e)}")
+                logging.error(f"Error checking subscription for channel {channel_id}: {str(e)}")
                 continue
             except Exception as e:
-                logging.error(f"Error checking subscription in {name} ({channel_id}): {str(e)}")
+                logging.error(f"Unexpected error for channel {channel_id}: {str(e)}")
                 continue
-                
         return True
 
     def get_force_sub_buttons(self) -> InlineKeyboardMarkup:
-        """Generate force subscription buttons without check button"""
+        """Generate force subscription buttons for configured channels"""
         buttons = []
         
-        for channel_id, channel_link, name in self.channel_configs:
-            if channel_id and channel_link:
-                buttons.append([
-                    InlineKeyboardButton(
-                        text=f"📢 Join {name} Channel",
-                        url=channel_link
-                    )
-                ])
+        for channel_id in self.force_sub_channels:
+            if channel_id in self.force_sub_links:
+                channel_link = self.force_sub_links[channel_id]
+                if channel_link and channel_link.startswith(("https://t.me/", "t.me/")):
+                    # Ensure the link is properly formatted
+                    if not channel_link.startswith("https://"):
+                        channel_link = "https://" + channel_link
+                    buttons.append([
+                        InlineKeyboardButton(
+                            text=f"📢 Join Channel",
+                            url=channel_link
+                        )
+                    ])
         
+        # Add support channel button if available
+        if config.SUPPORT_LINK:
+            buttons.append([
+                InlineKeyboardButton(
+                    text="📞 Support",
+                    url=config.SUPPORT_LINK
+                )
+            ])
+            
         return InlineKeyboardMarkup(buttons)
 
     def start_button(self) -> InlineKeyboardMarkup:
@@ -131,13 +119,10 @@ class ButtonManager:
     async def handle_subscription_check(self, client: Client, user_id: int) -> tuple[bool, InlineKeyboardMarkup]:
         """Handle subscription check and return appropriate buttons"""
         is_subscribed = await self.check_force_sub(client, user_id)
-        if is_subscribed:
-            return True, self.start_button()
-        else:
-            return False, self.get_force_sub_buttons()
+        return is_subscribed, self.start_button() if is_subscribed else self.get_force_sub_buttons()
 
     async def show_start(self, client: Client, callback_query: CallbackQuery):
-        """Show start message with automatic subscription check"""
+        """Show start message with subscription check"""
         try:
             is_subbed, markup = await self.handle_subscription_check(client, callback_query.from_user.id)
             await callback_query.message.edit_text(
@@ -152,7 +137,7 @@ class ButtonManager:
             logging.error(f"Error in show_start: {str(e)}")
 
     async def show_help(self, client: Client, callback_query: CallbackQuery):
-        """Show help message with automatic subscription check"""
+        """Show help message with subscription check"""
         try:
             is_subbed, markup = await self.handle_subscription_check(client, callback_query.from_user.id)
             await callback_query.message.edit_text(
@@ -164,7 +149,7 @@ class ButtonManager:
             logging.error(f"Error in show_help: {str(e)}")
 
     async def show_about(self, client: Client, callback_query: CallbackQuery):
-        """Show about message with automatic subscription check"""
+        """Show about message with subscription check"""
         try:
             is_subbed, markup = await self.handle_subscription_check(client, callback_query.from_user.id)
             await callback_query.message.edit_text(
