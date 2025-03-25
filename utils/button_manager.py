@@ -4,6 +4,7 @@ import config
 import logging
 from pyrogram.errors import UserNotParticipant, BadRequest
 from pyrogram.enums import ChatMemberStatus
+from pyrogram import Client
 
 class ButtonManager:
     def __init__(self):
@@ -30,47 +31,59 @@ class ButtonManager:
                 except (ValueError, TypeError):
                     logging.error(f"Invalid channel ID format for {name} channel: {channel_id}")
 
-    async def check_force_sub(self, client, user_id: int) -> bool:
+    async def check_force_sub(self, client: Client, user_id: int) -> bool:
         """Check user's subscription status in all required channels"""
         if not self.channel_configs:
             return True
 
-        for channel_id, _, name in self.channel_configs:
+        for channel_id, channel_link, name in self.channel_configs:
             try:
-                member = await client.get_chat_member(int(channel_id), user_id)
+                # Try to get chat member info
+                member = await client.get_chat_member(chat_id=int(channel_id), user_id=user_id)
+                
+                # Check if user is banned/kicked first
+                if member.status in ["kicked", "left", "restricted"]:
+                    return False
+                    
+                # Check for valid member status
                 if member.status not in ["member", "administrator", "creator"]:
                     return False
+                    
             except UserNotParticipant:
                 return False
-            except BadRequest as e:
-                error_msg = str(e).lower()
-                if "chat not found" in error_msg:
-                    logging.error(f"Channel {name} ({channel_id}) not found or bot not admin")
-                    continue
-                elif "user not found" in error_msg:
-                    return False
+            except (BadRequest, ChatMemberStatus):
+                logging.error(f"Bot is not admin in channel {name} ({channel_id}) or channel is invalid")
                 continue
             except Exception as e:
-                logging.error(f"Unexpected error checking {name} channel ({channel_id}): {str(e)}")
+                logging.error(f"Error checking subscription in {name} ({channel_id}): {str(e)}")
                 continue
+                
         return True
 
     def force_sub_button(self) -> InlineKeyboardMarkup:
-        """Generate force subscription buttons without refresh button"""
+        """Generate force subscription buttons"""
         buttons = []
         
         for channel_id, channel_link, name in self.channel_configs:
             if channel_id and channel_link:
                 buttons.append([
                     InlineKeyboardButton(
-                        text=f"📢 Join {name} Channel",
+                        text=f"✅ Join {name}",
                         url=channel_link
                     )
                 ])
         
+        # Add a refresh button
+        buttons.append([
+            InlineKeyboardButton(
+                text="🔄 Refresh Status",
+                callback_data="check_subscription"
+            )
+        ])
+        
         return InlineKeyboardMarkup(buttons)
 
-    async def show_start(self, client, callback_query: CallbackQuery):
+    async def show_start(self, client: Client, callback_query: CallbackQuery):
         """Show start message after checking subscription"""
         try:
             is_subbed = await self.check_force_sub(client, callback_query.from_user.id)
@@ -92,7 +105,7 @@ class ButtonManager:
         except Exception as e:
             logging.error(f"Error in show_start: {str(e)}")
 
-    async def show_help(self, client, callback_query: CallbackQuery):
+    async def show_help(self, client: Client, callback_query: CallbackQuery):
         """Show help message after checking subscription"""
         try:
             is_subbed = await self.check_force_sub(client, callback_query.from_user.id)
@@ -111,7 +124,7 @@ class ButtonManager:
         except Exception as e:
             logging.error(f"Error in show_help: {str(e)}")
 
-    async def show_about(self, client, callback_query: CallbackQuery):
+    async def show_about(self, client: Client, callback_query: CallbackQuery):
         """Show about message after checking subscription"""
         try:
             is_subbed = await self.check_force_sub(client, callback_query.from_user.id)
