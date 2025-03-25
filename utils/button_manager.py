@@ -3,6 +3,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 import config
 import logging
 from pyrogram.errors import UserNotParticipant, BadRequest
+from pyrogram.enums import ChatMemberStatus
 
 class ButtonManager:
     def __init__(self):
