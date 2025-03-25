@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import UserNotParticipant
 from database import Database
 from utils import ButtonManager
 import config
@@ -9,6 +10,15 @@ from ..utils.message_delete import schedule_message_deletion
 db = Database()
 button_manager = ButtonManager()
 
+async def check_force_sub_status(client: Client, user_id: int):
+    try:
+        await client.get_chat_member(config.FORCE_SUB_CHANNEL, user_id)
+        return True
+    except UserNotParticipant:
+        return False
+    except Exception:
+        return False
+
 @Client.on_message(filters.command("start"))
 async def start_command(client: Client, message: Message):
     await db.add_user(message.from_user.id, message.from_user.username)
@@ -16,18 +26,21 @@ async def start_command(client: Client, message: Message):
     if len(message.command) > 1:
         file_uuid = message.command[1]
         
-        if not await button_manager.check_force_sub(client, message.from_user.id):
+        is_subscribed = await check_force_sub_status(client, message.from_user.id)
+        if not is_subscribed:
             await message.reply_text(
                 "**⚠️ You must join our channel to use this bot!**\n\n"
-                "Please join Our Forcesub Channel and try again.",
-                reply_markup=button_manager.force_sub_button(),
-                protect_content=config.PRIVACY_MODE  
+                f"Please join @{config.FORCE_SUB_CHANNEL} and try again.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNEL}")]
+                ]),
+                protect_content=config.PRIVACY_MODE
             )
             return
         
         file_data = await db.get_file(file_uuid)
         if not file_data:
-            await message.reply_text("❌ File not found or has been deleted!", protect_content=config.PRIVACY_MODE)  
+            await message.reply_text("❌ File not found or has been deleted!", protect_content=config.PRIVACY_MODE)
             return
         
         try:
@@ -35,7 +48,7 @@ async def start_command(client: Client, message: Message):
                 chat_id=message.chat.id,
                 from_chat_id=config.DB_CHANNEL_ID,
                 message_id=file_data["message_id"],
-                protect_content=config.PRIVACY_MODE  
+                protect_content=config.PRIVACY_MODE
             )
             await db.increment_downloads(file_uuid)
             await db.update_file_message_id(file_uuid, msg.id, message.chat.id)
@@ -49,33 +62,47 @@ async def start_command(client: Client, message: Message):
                         f"• Delete Time: {delete_time} minutes\n"
                         f"• Time Left: {delete_time} minutes\n"
                         f"💡 **Save this file to your saved messages before it's deleted!**",
-                        protect_content=config.PRIVACY_MODE  
+                        protect_content=config.PRIVACY_MODE
                     )
                     
                     asyncio.create_task(schedule_message_deletion(
                         client, file_uuid, message.chat.id, [msg.id, info_msg.id], delete_time
                     ))
-                
         except Exception as e:
-            await message.reply_text(f"❌ Error: {str(e)}", protect_content=config.PRIVACY_MODE)  
+            await message.reply_text(f"❌ Error: {str(e)}", protect_content=config.PRIVACY_MODE)
         return
     
+    is_subscribed = await check_force_sub_status(client, message.from_user.id)
+    if not is_subscribed:
+        await message.reply_text(
+            "**⚠️ You must join our channel to use this bot!**\n\n"
+            f"Please join @{config.FORCE_SUB_CHANNEL} and try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNEL}")]
+            ]),
+            protect_content=config.PRIVACY_MODE
+        )
+        return
+
     await message.reply_text(
         config.Messages.START_TEXT.format(
             bot_name=config.BOT_NAME,
             user_mention=message.from_user.mention
         ),
         reply_markup=button_manager.start_button(),
-        protect_content=config.PRIVACY_MODE  
+        protect_content=config.PRIVACY_MODE
     )
 
 @Client.on_message(filters.command("upload") & filters.private & filters.reply)
 async def upload_command(client: Client, message: Message):
-    if not await button_manager.check_force_sub(client, message.from_user.id):
+    is_subscribed = await check_force_sub_status(client, message.from_user.id)
+    if not is_subscribed:
         await message.reply_text(
             "**⚠️ You must join our channel to use this bot!**\n\n"
-            "Please join Our Forcesub Channel and try again.",
-            reply_markup=button_manager.force_sub_button(),
+            f"Please join @{config.FORCE_SUB_CHANNEL} and try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNEL}")]
+            ]),
             protect_content=config.PRIVACY_MODE
         )
         return
@@ -99,11 +126,14 @@ async def upload_command(client: Client, message: Message):
 
 @Client.on_message(filters.command("batch_upload") & filters.private)
 async def batch_upload_command(client: Client, message: Message):
-    if not await button_manager.check_force_sub(client, message.from_user.id):
+    is_subscribed = await check_force_sub_status(client, message.from_user.id)
+    if not is_subscribed:
         await message.reply_text(
             "**⚠️ You must join our channel to use this bot!**\n\n"
-            "Please join Our Forcesub Channel and try again.",
-            reply_markup=button_manager.force_sub_button(),
+            f"Please join @{config.FORCE_SUB_CHANNEL} and try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNEL}")]
+            ]),
             protect_content=config.PRIVACY_MODE
         )
         return
@@ -138,11 +168,14 @@ async def batch_start_command(client: Client, message: Message):
     if len(message.command) > 1 and message.command[1].startswith("batch_"):
         batch_uuid = message.command[1].split("_")[1]
 
-        if not await button_manager.check_force_sub(client, message.from_user.id):
+        is_subscribed = await check_force_sub_status(client, message.from_user.id)
+        if not is_subscribed:
             await message.reply_text(
                 "**⚠️ You must join our channel to use this bot!**\n\n"
-                "Please join Our Forcesub Channel and try again.",
-                reply_markup=button_manager.force_sub_button(),
+                f"Please join @{config.FORCE_SUB_CHANNEL} and try again.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNEL}")]
+                ]),
                 protect_content=config.PRIVACY_MODE
             )
             return
@@ -164,7 +197,6 @@ async def batch_start_command(client: Client, message: Message):
                 await db.update_file_message_id(file_data["file_uuid"], msg.id, message.chat.id)
             except Exception as e:
                 await message.reply_text(f"❌ Error: {str(e)}", protect_content=config.PRIVACY_MODE)
-
         return
 
     await message.reply_text(
@@ -174,4 +206,4 @@ async def batch_start_command(client: Client, message: Message):
         ),
         reply_markup=button_manager.start_button(),
         protect_content=config.PRIVACY_MODE
-                    )
+        )
