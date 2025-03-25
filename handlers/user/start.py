@@ -1,6 +1,5 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import UserNotParticipant
 from database import Database
 from utils import ButtonManager
 import config
@@ -10,15 +9,6 @@ from ..utils.message_delete import schedule_message_deletion
 db = Database()
 button_manager = ButtonManager()
 
-async def check_force_sub_status(client: Client, user_id: int):
-    try:
-        await client.get_chat_member(config.FORCE_SUB_CHANNEL, user_id)
-        return True
-    except UserNotParticipant:
-        return False
-    except Exception:
-        return False
-
 @Client.on_message(filters.command("start"))
 async def start_command(client: Client, message: Message):
     await db.add_user(message.from_user.id, message.from_user.username)
@@ -26,15 +16,12 @@ async def start_command(client: Client, message: Message):
     if len(message.command) > 1:
         file_uuid = message.command[1]
         
-        is_subscribed = await check_force_sub_status(client, message.from_user.id)
+        is_subscribed = await button_manager.check_force_sub(client, message.from_user.id)
         if not is_subscribed:
             await message.reply_text(
-                "**⚠️ You must join our channel to use this bot!**\n\n"
-                f"Please join @{config.FORCE_SUB_CHANNELS} and try again.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNELS}")]
-                ]),
-                protect_content=config.PRIVACY_MODE
+                config.Messages.FORCE_SUB_TEXT,
+                reply_markup=button_manager.get_force_sub_buttons(),
+                disable_web_page_preview=True
             )
             return
         
@@ -72,15 +59,13 @@ async def start_command(client: Client, message: Message):
             await message.reply_text(f"❌ Error: {str(e)}", protect_content=config.PRIVACY_MODE)
         return
     
-    is_subscribed = await check_force_sub_status(client, message.from_user.id)
+    # Check force subscription for start command
+    is_subscribed = await button_manager.check_force_sub(client, message.from_user.id)
     if not is_subscribed:
         await message.reply_text(
-            "**⚠️ You must join our channel to use this bot!**\n\n"
-            f"Please join @{config.FORCE_SUB_CHANNELS} and try again.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNELS}")]
-            ]),
-            protect_content=config.PRIVACY_MODE
+            config.Messages.FORCE_SUB_TEXT,
+            reply_markup=button_manager.get_force_sub_buttons(),
+            disable_web_page_preview=True
         )
         return
 
@@ -95,15 +80,12 @@ async def start_command(client: Client, message: Message):
 
 @Client.on_message(filters.command("upload") & filters.private & filters.reply)
 async def upload_command(client: Client, message: Message):
-    is_subscribed = await check_force_sub_status(client, message.from_user.id)
+    is_subscribed = await button_manager.check_force_sub(client, message.from_user.id)
     if not is_subscribed:
         await message.reply_text(
-            "**⚠️ You must join our channel to use this bot!**\n\n"
-            f"Please join @{config.FORCE_SUB_CHANNELS} and try again.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNELS}")]
-            ]),
-            protect_content=config.PRIVACY_MODE
+            config.Messages.FORCE_SUB_TEXT,
+            reply_markup=button_manager.get_force_sub_buttons(),
+            disable_web_page_preview=True
         )
         return
 
@@ -126,15 +108,12 @@ async def upload_command(client: Client, message: Message):
 
 @Client.on_message(filters.command("batch_upload") & filters.private)
 async def batch_upload_command(client: Client, message: Message):
-    is_subscribed = await check_force_sub_status(client, message.from_user.id)
+    is_subscribed = await button_manager.check_force_sub(client, message.from_user.id)
     if not is_subscribed:
         await message.reply_text(
-            "**⚠️ You must join our channel to use this bot!**\n\n"
-            f"Please join @{config.FORCE_SUB_CHANNELS} and try again.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNELS}")]
-            ]),
-            protect_content=config.PRIVACY_MODE
+            config.Messages.FORCE_SUB_TEXT,
+            reply_markup=button_manager.get_force_sub_buttons(),
+            disable_web_page_preview=True
         )
         return
 
@@ -168,15 +147,12 @@ async def batch_start_command(client: Client, message: Message):
     if len(message.command) > 1 and message.command[1].startswith("batch_"):
         batch_uuid = message.command[1].split("_")[1]
 
-        is_subscribed = await check_force_sub_status(client, message.from_user.id)
+        is_subscribed = await button_manager.check_force_sub(client, message.from_user.id)
         if not is_subscribed:
             await message.reply_text(
-                "**⚠️ You must join our channel to use this bot!**\n\n"
-                f"Please join @{config.FORCE_SUB_CHANNELS} and try again.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNELS}")]
-                ]),
-                protect_content=config.PRIVACY_MODE
+                config.Messages.FORCE_SUB_TEXT,
+                reply_markup=button_manager.get_force_sub_buttons(),
+                disable_web_page_preview=True
             )
             return
 
