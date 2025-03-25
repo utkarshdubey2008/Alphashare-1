@@ -30,7 +30,7 @@ async def start_command(client: Client, message: Message):
         if not is_subscribed:
             await message.reply_text(
                 "**⚠️ You must join our channel to use this bot!**\n\n"
-                f"Please join @{config.FORCE_SUB_CHANNEL} and try again.",
+                f"Please join @{config.FORCE_SUB_CHANNELS} and try again.",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{config.FORCE_SUB_CHANNEL}")]
                 ]),
